@@ -1,4 +1,4 @@
-++++++# 2.4 GHz RF Spectrum Monitor - Professional Documentation
+#2.4 GHz RF Spectrum Monitor 
 
 **Versions:** 3  
 **Last Updated:** February 2026  
