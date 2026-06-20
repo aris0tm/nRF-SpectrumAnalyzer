@@ -1,8 +1,8 @@
 ++++++# 2.4 GHz RF Spectrum Monitor - Professional Documentation
 
-**Version:** 3.0  
+**Versions:** 3  
 **Last Updated:** February 2026  
-**Author:** RF Security Research Team  
+**Author:** aris0tm ( Harishkumar )
 **Platform:** Arduino + NRF24L01+PA+LNA  
 
 ---
