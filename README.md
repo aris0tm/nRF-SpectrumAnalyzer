@@ -2,7 +2,7 @@
 
 **Versions:** 3  
 **Last Updated:** February 2026  
-**Author:** aris0tm ( Harishkumar ), zeus0tm (Balasubramaniam )
+**Author:** aris0tm ( Harishkumar ), Zeus0tm (Balasubramaniam )
 **Platform:** Arduino + NRF24L01+PA+LNA  
 
 ---
