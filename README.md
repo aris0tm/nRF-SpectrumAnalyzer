@@ -1,6 +1,6 @@
 # nRF-SpectrumAnalyzer
 
-[![DOI](DOI_BADGE_HERE)](DOI_LINK_HERE)
+[![DOI](https://zenodo.org/badge/1172231464.svg)](https://doi.org/10.5281/zenodo.20783176)
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 A low-cost dual-node 2.4 GHz ISM band occupancy monitoring and interference characterization platform built using commodity embedded hardware.
