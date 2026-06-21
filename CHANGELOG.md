@@ -1,5 +1,6 @@
 # Changelog
 
+
 All notable changes to this project are documented in this file.
 
 The project follows semantic versioning principles where practical.
