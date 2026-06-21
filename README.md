@@ -40,7 +40,7 @@ The archived release associated with the manuscript contains the detector firmwa
 
 # System Architecture
 
-![fig.1](/images/arche.jpeg)
+![fig.1](/images/arche.png)
 
 *Figure 1. High-level architecture of the dual-node experimental platform.*
 
@@ -48,7 +48,7 @@ The archived release associated with the manuscript contains the detector firmwa
 
 # Detection Logic
 
-![fig.2](/images/logic.jpeg)
+![fig.2](/images/logic.png)
 
 *Figure 2. Channel occupancy measurement and interference detection workflow.*
 
@@ -91,19 +91,19 @@ Functions:
 
 ## Monitoring Node
 
-![fig.3](/images/Moniter_node.jpeg)
+<img src="/images/Moniter_node.jpeg" width="800">
 
 ---
 
 ## Interference Node
 
-![fig.4](/images/Interferance_node.jpeg)
+<img src="images/Interferance_node.jpeg" width="800">
 
 ---
 
 ## Pin Mapping & Wiring Diagram
 
-![Pinmap and wiring](/docs/Manual.md)
+[Pinmap and wiring](/docs/Manual.md)
 
 ---
 
