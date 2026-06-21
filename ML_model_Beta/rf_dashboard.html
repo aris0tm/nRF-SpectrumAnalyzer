@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RF MONITOR — THREAT CONSOLE</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #030609;
+    --bg2:       #060d14;
+    --bg3:       #0a1520;
+    --grid:      #0d2035;
+    --border:    #0e3a5a;
+    --green:     #00ff88;
+    --green2:    #00cc66;
+    --yellow:    #ffcc00;
+    --orange:    #ff8800;
+    --red:       #ff2244;
+    --red2:      #cc0022;
+    --cyan:      #00ccff;
+    --cyan2:     #0088bb;
+    --dim:       #1a3a55;
+    --text:      #8ab8d4;
+    --text2:     #4a7a9b;
+    --white:     #e0f0ff;
+    --scan:      rgba(0,200,255,0.03);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* scanline overlay */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.08) 2px,
+      rgba(0,0,0,0.08) 4px
+    );
+    pointer-events: none;
+    z-index: 1000;
+  }
+
+  /* vignette */
+  body::after {
+    content: '';
+    position: fixed; inset: 0;
+    background: radial-gradient(ellipse at center,
+      transparent 60%,
+      rgba(0,0,0,0.6) 100%
+    );
+    pointer-events: none;
+    z-index: 999;
+  }
+
+  /* ── HEADER ─────────────────────────────────────────────── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 24px 10px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg2);
+    position: relative;
+    overflow: hidden;
+  }
+
+  header::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(90deg,
+      transparent, rgba(0,200,255,0.04), transparent);
+    animation: sweep 4s linear infinite;
+  }
+
+  @keyframes sweep {
+    0%   { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+  }
+
+  .logo {
+    font-family: 'Orbitron', monospace;
+    font-weight: 900;
+    font-size: 22px;
+    color: var(--cyan);
+    letter-spacing: 4px;
+    text-shadow: 0 0 20px rgba(0,200,255,0.5);
+  }
+  .logo span { color: var(--red); }
+
+  .header-meta {
+    display: flex; gap: 28px; align-items: center;
+  }
+  .meta-item { display: flex; flex-direction: column; align-items: center; }
+  .meta-label { font-size: 9px; color: var(--text2); letter-spacing: 2px; }
+  .meta-value {
+    font-family: 'Orbitron', monospace;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--cyan);
+  }
+
+  #status-pill {
+    padding: 5px 14px;
+    border-radius: 2px;
+    font-family: 'Orbitron', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    border: 1px solid;
+    transition: all 0.3s;
+  }
+  .pill-conn   { background: rgba(0,255,136,0.1); border-color: var(--green);  color: var(--green); }
+  .pill-disc   { background: rgba(255,34,68,0.1);  border-color: var(--red);    color: var(--red); }
+  .pill-wait   { background: rgba(255,204,0,0.1);  border-color: var(--yellow); color: var(--yellow); }
+
+  /* ── MAIN GRID ───────────────────────────────────────────── */
+  .main {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    grid-template-rows: auto auto 1fr;
+    gap: 1px;
+    background: var(--border);
+    min-height: calc(100vh - 60px);
+  }
+
+  .panel {
+    background: var(--bg2);
+    padding: 14px 16px;
+  }
+
+  .panel-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    color: var(--text2);
+    margin-bottom: 12px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--grid);
+  }
+
+  /* ── ALERT BANNER ────────────────────────────────────────── */
+  #alert-banner {
+    grid-column: 1 / -1;
+    padding: 12px 24px;
+    font-family: 'Orbitron', monospace;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 4px;
+    text-align: center;
+    transition: all 0.4s;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+    overflow: hidden;
+  }
+  #alert-banner::after {
+    content: '';
+    position: absolute; inset: 0;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .banner-clear   { background: rgba(0,255,136,0.06); color: var(--green);  border-color: var(--green2); }
+  .banner-anomaly { background: rgba(255,204,0,0.08); color: var(--yellow); border-color: var(--yellow); }
+  .banner-warning { background: rgba(255,136,0,0.1);  color: var(--orange); border-color: var(--orange); }
+  .banner-attack  {
+    background: rgba(255,34,68,0.12);
+    color: var(--red);
+    border-color: var(--red);
+    animation: attack-pulse 0.8s ease-in-out infinite;
+  }
+  @keyframes attack-pulse {
+    0%, 100% { box-shadow: 0 0 0px rgba(255,34,68,0); }
+    50%       { box-shadow: 0 0 30px rgba(255,34,68,0.3); }
+  }
+
+  /* ── SPECTRUM ────────────────────────────────────────────── */
+  #spectrum-wrap {
+    grid-column: 1;
+  }
+
+  #spectrum-canvas {
+    width: 100%;
+    height: 180px;
+    display: block;
+  }
+
+  .freq-labels {
+    display: flex;
+    justify-content: space-between;
+    padding: 2px 0;
+    font-size: 9px;
+    color: var(--text2);
+  }
+
+  /* ── PROBABILITIES ───────────────────────────────────────── */
+  #proba-panel { grid-column: 2; grid-row: 2 / 4; }
+
+  .proba-row {
+    margin-bottom: 10px;
+  }
+  .proba-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 3px;
+    font-size: 11px;
+  }
+  .proba-name { color: var(--text); }
+  .proba-val  { color: var(--cyan); font-weight: bold; }
+  .proba-bar-bg {
+    height: 6px;
+    background: var(--bg3);
+    border: 1px solid var(--dim);
+    border-radius: 1px;
+    overflow: hidden;
+  }
+  .proba-bar-fill {
+    height: 100%;
+    border-radius: 1px;
+    transition: width 0.4s ease;
+  }
+
+  /* ── ISO SCORE GAUGE ─────────────────────────────────────── */
+  .iso-section { margin-top: 18px; }
+  .iso-label {
+    font-size: 9px;
+    color: var(--text2);
+    letter-spacing: 2px;
+    margin-bottom: 6px;
+  }
+  #iso-gauge {
+    width: 100%;
+    height: 8px;
+    background: var(--bg3);
+    border: 1px solid var(--dim);
+    border-radius: 1px;
+    overflow: hidden;
+    position: relative;
+  }
+  #iso-fill {
+    height: 100%;
+    width: 50%;
+    background: var(--green);
+    transition: width 0.4s, background 0.4s;
+    border-radius: 1px;
+  }
+  #iso-score-text {
+    text-align: right;
+    font-size: 10px;
+    color: var(--text2);
+    margin-top: 3px;
+  }
+
+  /* ── EVENT LOG ───────────────────────────────────────────── */
+  #log-panel {
+    grid-column: 1;
+    grid-row: 3;
+    display: flex;
+    flex-direction: column;
+  }
+
+  #event-log {
+    flex: 1;
+    overflow-y: auto;
+    max-height: 280px;
+    padding-right: 4px;
+  }
+
+  #event-log::-webkit-scrollbar { width: 4px; }
+  #event-log::-webkit-scrollbar-track { background: var(--bg); }
+  #event-log::-webkit-scrollbar-thumb { background: var(--dim); border-radius: 2px; }
+
+  .log-entry {
+    display: flex;
+    gap: 10px;
+    padding: 5px 6px;
+    border-bottom: 1px solid rgba(13,32,53,0.8);
+    animation: fadeIn 0.3s ease;
+    font-size: 11.5px;
+    align-items: baseline;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateX(-6px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+  .log-time  { color: var(--text2); min-width: 58px; }
+  .log-badge {
+    font-family: 'Orbitron', monospace;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 1px;
+    min-width: 66px;
+    text-align: center;
+    border: 1px solid;
+  }
+  .log-label { flex: 1; }
+  .log-conf  { color: var(--text2); min-width: 40px; text-align: right; }
+  .log-detail { font-size: 10px; color: var(--text2); }
+
+  .badge-clear   { background: rgba(0,255,136,0.08);  border-color: var(--green2); color: var(--green);  }
+  .badge-anomaly { background: rgba(255,204,0,0.08);  border-color: var(--yellow); color: var(--yellow); }
+  .badge-warning { background: rgba(255,136,0,0.1);   border-color: var(--orange); color: var(--orange); }
+  .badge-attack  { background: rgba(255,34,68,0.12);  border-color: var(--red);    color: var(--red);    }
+
+  /* ── STATS ROW ───────────────────────────────────────────── */
+  .stats-row {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 1px;
+    background: var(--border);
+  }
+  .stat-box {
+    background: var(--bg3);
+    padding: 10px 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .stat-label {
+    font-size: 8px;
+    letter-spacing: 2px;
+    color: var(--text2);
+    margin-bottom: 4px;
+  }
+  .stat-val {
+    font-family: 'Orbitron', monospace;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--cyan);
+    line-height: 1;
+  }
+  .stat-val.red    { color: var(--red); }
+  .stat-val.yellow { color: var(--yellow); }
+  .stat-val.green  { color: var(--green); }
+
+  /* ── WATERFALL ───────────────────────────────────────────── */
+  #waterfall-canvas {
+    width: 100%;
+    height: 120px;
+    display: block;
+    image-rendering: pixelated;
+  }
+
+  /* ── CONNECTING SCREEN ───────────────────────────────────── */
+  #connecting {
+    position: fixed; inset: 0;
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    gap: 20px;
+  }
+  #connecting.hidden { display: none; }
+
+  .connect-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 28px;
+    font-weight: 900;
+    color: var(--cyan);
+    letter-spacing: 6px;
+    text-shadow: 0 0 30px rgba(0,200,255,0.4);
+  }
+  .connect-sub {
+    font-size: 12px;
+    color: var(--text2);
+    letter-spacing: 3px;
+  }
+  .connect-dots {
+    display: flex; gap: 8px;
+  }
+  .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--cyan2);
+    animation: blink 1.2s ease-in-out infinite;
+  }
+  .dot:nth-child(2) { animation-delay: 0.2s; }
+  .dot:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes blink {
+    0%, 80%, 100% { opacity: 0.2; transform: scale(0.8); }
+    40%            { opacity: 1;   transform: scale(1.2); }
+  }
+
+  .connect-hint {
+    font-size: 11px;
+    color: var(--dim);
+    letter-spacing: 1px;
+    margin-top: 10px;
+  }
+</style>
+</head>
+<body>
+
+<!-- Connecting overlay -->
+<div id="connecting">
+  <div class="connect-title">RF MONITOR</div>
+  <div class="connect-sub">THREAT CONSOLE v3.0.0</div>
+  <div class="connect-dots">
+    <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+  </div>
+  <div class="connect-hint">Connecting to ws://localhost:8765 — run rf_detector.py first</div>
+</div>
+
+<!-- Header -->
+<header>
+  <div class="logo">RF<span>—</span>MONITOR <span style="font-size:14px;opacity:.5">THREAT CONSOLE</span></div>
+  <div class="header-meta">
+    <div class="meta-item">
+      <span class="meta-label">SWEEPS</span>
+      <span class="meta-value" id="hdr-sweeps">0</span>
+    </div>
+    <div class="meta-item">
+      <span class="meta-label">UPTIME</span>
+      <span class="meta-value" id="hdr-uptime">00:00</span>
+    </div>
+    <div class="meta-item">
+      <span class="meta-label">ATTACKS</span>
+      <span class="meta-value" id="hdr-attacks" style="color:var(--red)">0</span>
+    </div>
+    <div id="status-pill" class="pill-wait">WAITING</div>
+  </div>
+</header>
+
+<!-- Alert banner -->
+<div id="alert-banner" class="banner-clear">— BASELINE NORMAL —</div>
+
+<div class="main">
+
+  <!-- Stats row -->
+  <div class="stats-row">
+    <div class="stat-box">
+      <span class="stat-label">ACTIVE CH</span>
+      <span class="stat-val" id="s-active">—</span>
+    </div>
+    <div class="stat-box">
+      <span class="stat-label">ALERTS</span>
+      <span class="stat-val" id="s-alerts">—</span>
+    </div>
+    <div class="stat-box">
+      <span class="stat-label">SPIKES</span>
+      <span class="stat-val" id="s-spikes">—</span>
+    </div>
+    <div class="stat-box">
+      <span class="stat-label">WIFI ENERGY</span>
+      <span class="stat-val" id="s-wifi">—</span>
+    </div>
+    <div class="stat-box">
+      <span class="stat-label">BLE ENERGY</span>
+      <span class="stat-val" id="s-ble">—</span>
+    </div>
+    <div class="stat-box">
+      <span class="stat-label">BT ENERGY</span>
+      <span class="stat-val" id="s-bt">—</span>
+    </div>
+    <div class="stat-box">
+      <span class="stat-label">MAX PCT</span>
+      <span class="stat-val" id="s-max">—</span>
+    </div>
+  </div>
+
+  <!-- Spectrum panel -->
+  <div class="panel" id="spectrum-wrap">
+    <div class="panel-title">SPECTRUM — 2400–2525 MHz (CH 0–125)</div>
+    <canvas id="spectrum-canvas" width="800" height="180"></canvas>
+    <div class="freq-labels">
+      <span>2400</span><span>2413</span><span>2426</span>
+      <span>2440</span><span>2454</span><span>2468</span>
+      <span>2480</span><span>2496</span><span>2510</span><span>2525 MHz</span>
+    </div>
+    <div style="margin-top:10px">
+      <div class="panel-title">WATERFALL HISTORY</div>
+      <canvas id="waterfall-canvas" width="800" height="120"></canvas>
+    </div>
+  </div>
+
+  <!-- Probabilities panel -->
+  <div class="panel" id="proba-panel">
+    <div class="panel-title">CLASSIFIER PROBABILITIES</div>
+
+    <div id="proba-rows">
+      <!-- filled by JS -->
+    </div>
+
+    <div class="iso-section">
+      <div class="iso-label">ISOLATION FOREST SCORE</div>
+      <div id="iso-gauge"><div id="iso-fill"></div></div>
+      <div id="iso-score-text">—</div>
+      <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text2);margin-top:2px">
+        <span>NORMAL</span><span>ANOMALOUS</span>
+      </div>
+    </div>
+
+    <div style="margin-top:20px">
+      <div class="panel-title">BAND ACTIVITY</div>
+      <canvas id="band-canvas" width="300" height="80"></canvas>
+    </div>
+  </div>
+
+  <!-- Event log -->
+  <div class="panel" id="log-panel">
+    <div class="panel-title">DETECTION LOG</div>
+    <div id="event-log"></div>
+  </div>
+
+</div>
+
+<script>
+// ── state ────────────────────────────────────────────────────
+const NUM_CH = 126;
+let sweepCount = 0;
+let attackCount = 0;
+let startTime = null;
+let waterfallRows = [];
+const MAX_WF_ROWS = 60;
+
+const LABEL_COLORS = {
+  normal:          '#00ff88',
+  anomaly:         '#ffcc00',
+  jamming:         '#ff2244',
+  wifi_deauth:     '#ff8800',
+  ble_flood:       '#ff4488',
+  bt_interference: '#cc44ff',
+};
+
+const BANNER_TEXT = {
+  CLEAR:   '— BASELINE NORMAL —',
+  ANOMALY: '⚠  ANOMALY DETECTED',
+  WARNING: '⚠  SUSPICIOUS ACTIVITY',
+  ATTACK:  '🔴  ATTACK DETECTED',
+};
+
+// ── canvas refs ──────────────────────────────────────────────
+const specCanvas = document.getElementById('spectrum-canvas');
+const specCtx    = specCanvas.getContext('2d');
+const wfCanvas   = document.getElementById('waterfall-canvas');
+const wfCtx      = wfCanvas.getContext('2d');
+const bandCanvas = document.getElementById('band-canvas');
+const bandCtx    = bandCanvas.getContext('2d');
+
+function resizeCanvases() {
+  const wrap = document.getElementById('spectrum-wrap');
+  const w = wrap.clientWidth - 32;
+  specCanvas.width = w;
+  wfCanvas.width   = w;
+}
+window.addEventListener('resize', resizeCanvases);
+resizeCanvases();
+
+// ── spectrum draw ────────────────────────────────────────────
+function drawSpectrum(spectrum) {
+  const W = specCanvas.width, H = specCanvas.height;
+  specCtx.clearRect(0, 0, W, H);
+
+  // background grid
+  specCtx.strokeStyle = 'rgba(13,32,53,0.8)';
+  specCtx.lineWidth = 1;
+  for (let y = 0; y <= H; y += H/4) {
+    specCtx.beginPath(); specCtx.moveTo(0,y); specCtx.lineTo(W,y); specCtx.stroke();
+  }
+  for (let x = 0; x <= W; x += W/10) {
+    specCtx.beginPath(); specCtx.moveTo(x,0); specCtx.lineTo(x,H); specCtx.stroke();
+  }
+
+  // BLE marker bands
+  const BLE = [2,26,80];
+  BLE.forEach(ch => {
+    const x = (ch / (NUM_CH-1)) * W;
+    specCtx.fillStyle = 'rgba(0,200,255,0.06)';
+    specCtx.fillRect(x-2, 0, 4, H);
+  });
+
+  // WiFi bands
+  const WIFI = [12,17,22,27,32,37,42,47,52,57,62,67,72];
+  WIFI.forEach(ch => {
+    const x = (ch / (NUM_CH-1)) * W;
+    specCtx.fillStyle = 'rgba(255,136,0,0.05)';
+    specCtx.fillRect(x-2, 0, 4, H);
+  });
+
+  if (!spectrum || spectrum.length < NUM_CH) return;
+
+  // filled area
+  const barW = W / NUM_CH;
+  spectrum.forEach((pct, ch) => {
+    if (pct <= 0) return;
+    const x = ch * barW;
+    const h = (pct / 100) * H;
+    const y = H - h;
+
+    // gradient fill
+    const grad = specCtx.createLinearGradient(0, y, 0, H);
+    let top, bot;
+    if (pct >= 50)      { top='rgba(255,34,68,0.9)';  bot='rgba(255,34,68,0.2)'; }
+    else if (pct >= 20) { top='rgba(255,136,0,0.85)'; bot='rgba(255,136,0,0.15)'; }
+    else                { top='rgba(0,255,136,0.7)';  bot='rgba(0,255,136,0.05)'; }
+    grad.addColorStop(0, top);
+    grad.addColorStop(1, bot);
+    specCtx.fillStyle = grad;
+    specCtx.fillRect(x, y, Math.max(barW-0.5, 1), h);
+  });
+
+  // line trace on top
+  specCtx.beginPath();
+  specCtx.strokeStyle = 'rgba(0,200,255,0.6)';
+  specCtx.lineWidth = 1;
+  spectrum.forEach((pct, ch) => {
+    const x = ch * barW + barW/2;
+    const y = H - (pct / 100) * H;
+    ch === 0 ? specCtx.moveTo(x, y) : specCtx.lineTo(x, y);
+  });
+  specCtx.stroke();
+}
+
+// ── waterfall ────────────────────────────────────────────────
+function pctToColor(pct) {
+  if (pct <= 0)  return [3, 6, 9];
+  if (pct < 10)  return [0, 30, 15];
+  if (pct < 20)  return [0, 80, 40];
+  if (pct < 40)  return [255, 140, 0];
+  if (pct < 60)  return [255, 60, 0];
+  return [255, 20, 50];
+}
+
+function pushWaterfall(spectrum) {
+  waterfallRows.push([...spectrum]);
+  if (waterfallRows.length > MAX_WF_ROWS) waterfallRows.shift();
+  drawWaterfall();
+}
+
+function drawWaterfall() {
+  const W = wfCanvas.width, H = wfCanvas.height;
+  const rowH = H / MAX_WF_ROWS;
+  const colW = W / NUM_CH;
+  wfCtx.clearRect(0, 0, W, H);
+  waterfallRows.forEach((row, ri) => {
+    const y = ri * rowH;
+    row.forEach((pct, ch) => {
+      const [r,g,b] = pctToColor(pct);
+      wfCtx.fillStyle = `rgb(${r},${g},${b})`;
+      wfCtx.fillRect(ch * colW, y, Math.max(colW, 1), Math.max(rowH, 1));
+    });
+  });
+}
+
+// ── band mini chart ───────────────────────────────────────────
+function drawBandChart(wifi, ble, bt) {
+  const W = bandCanvas.width, H = bandCanvas.height;
+  bandCtx.clearRect(0, 0, W, H);
+
+  const bands = [
+    { label: 'WiFi', val: wifi,  max: 1300, color: '#ff8800' },
+    { label: 'BLE',  val: ble,   max: 300,  color: '#00ccff' },
+    { label: 'BT',   val: bt,    max: 7700, color: '#cc44ff' },
+  ];
+
+  const bw = W / bands.length;
+  bands.forEach((b, i) => {
+    const x = i * bw + 4;
+    const w = bw - 8;
+    const frac = Math.min(b.val / b.max, 1);
+    const bh = frac * (H - 20);
+
+    bandCtx.fillStyle = 'rgba(13,32,53,0.8)';
+    bandCtx.fillRect(x, 0, w, H-18);
+
+    const grad = bandCtx.createLinearGradient(0, H-18-bh, 0, H-18);
+    grad.addColorStop(0, b.color);
+    grad.addColorStop(1, b.color + '33');
+    bandCtx.fillStyle = grad;
+    bandCtx.fillRect(x, H-18-bh, w, bh);
+
+    bandCtx.fillStyle = '#4a7a9b';
+    bandCtx.font = '9px Share Tech Mono';
+    bandCtx.textAlign = 'center';
+    bandCtx.fillText(b.label, x + w/2, H-4);
+    bandCtx.fillStyle = b.color;
+    bandCtx.fillText(b.val, x + w/2, H-16);
+  });
+}
+
+// ── probabilities ─────────────────────────────────────────────
+function updateProbas(all_proba, pred_label) {
+  const container = document.getElementById('proba-rows');
+  container.innerHTML = '';
+  const sorted = Object.entries(all_proba).sort((a,b) => b[1]-a[1]);
+  sorted.forEach(([label, prob]) => {
+    const isActive = label === pred_label;
+    const color = LABEL_COLORS[label] || '#8ab8d4';
+    const pct = (prob * 100).toFixed(1);
+    container.innerHTML += `
+      <div class="proba-row">
+        <div class="proba-header">
+          <span class="proba-name" style="${isActive?'color:'+color+';font-weight:bold':''}">${label}</span>
+          <span class="proba-val" style="color:${color}">${pct}%</span>
+        </div>
+        <div class="proba-bar-bg">
+          <div class="proba-bar-fill"
+               style="width:${pct}%;background:${color}"></div>
+        </div>
+      </div>`;
+  });
+}
+
+// ── iso gauge ─────────────────────────────────────────────────
+function updateIso(isoScore) {
+  // isoScore: negative = anomalous, ~0.1 = normal
+  // Map [-0.2, 0.2] → [100%, 0%] fill width (red = right)
+  const fill = document.getElementById('iso-fill');
+  const text = document.getElementById('iso-score-text');
+  const norm = Math.max(0, Math.min(1, (isoScore + 0.2) / 0.4));
+  const pct  = (norm * 100).toFixed(0);
+  fill.style.width = pct + '%';
+  fill.style.background = norm > 0.5 ? '#00ff88' : norm > 0.3 ? '#ffcc00' : '#ff2244';
+  text.textContent = `score: ${isoScore.toFixed(4)}`;
+}
+
+// ── alert banner ──────────────────────────────────────────────
+function updateBanner(level, label, conf) {
+  const banner = document.getElementById('alert-banner');
+  banner.className = 'banner-' + level.toLowerCase();
+  const text = BANNER_TEXT[level] || level;
+  banner.textContent = level === 'CLEAR'
+    ? text
+    : `${text} — ${label.toUpperCase()} (${(conf*100).toFixed(0)}% confidence)`;
+}
+
+// ── stats ─────────────────────────────────────────────────────
+function updateStats(feats, level) {
+  const setVal = (id, v, cls) => {
+    const el = document.getElementById(id);
+    el.textContent = v;
+    el.className = 'stat-val ' + (cls||'');
+  };
+  setVal('s-active', feats.active_count);
+  setVal('s-alerts', feats.alert_count,
+         feats.alert_count > 10 ? 'red' : feats.alert_count > 0 ? 'yellow' : 'green');
+  setVal('s-spikes', feats.spike_count,
+         feats.spike_count > 3 ? 'red' : feats.spike_count > 0 ? 'yellow' : '');
+  setVal('s-wifi',  feats.wifi_band_energy);
+  setVal('s-ble',   feats.ble_band_energy);
+  setVal('s-bt',    feats.bt_band_energy);
+  setVal('s-max',   feats.max_pct + '%',
+         feats.max_pct >= 50 ? 'red' : feats.max_pct >= 20 ? 'yellow' : 'green');
+}
+
+// ── event log ─────────────────────────────────────────────────
+function appendLog(event) {
+  const log   = document.getElementById('event-log');
+  const r     = event.result;
+  const lvl   = r.level.toLowerCase();
+  const color = LABEL_COLORS[r.label] || '#8ab8d4';
+  const conf  = (r.confidence * 100).toFixed(0);
+
+  const div = document.createElement('div');
+  div.className = 'log-entry';
+  div.innerHTML = `
+    <span class="log-time">${event.time_str}</span>
+    <span class="log-badge badge-${lvl}">${r.level}</span>
+    <span class="log-label" style="color:${color}">${r.label}</span>
+    <span class="log-conf">${conf}%</span>
+    <span class="log-detail">a=${event.feats.alert_count} sp=${event.feats.spike_count}</span>
+  `;
+  log.insertBefore(div, log.firstChild);
+
+  // keep last 100
+  while (log.children.length > 100) log.removeChild(log.lastChild);
+}
+
+// ── header counters ───────────────────────────────────────────
+function updateHeader(sweepN, level) {
+  document.getElementById('hdr-sweeps').textContent = sweepN;
+  if (level === 'ATTACK') {
+    attackCount++;
+    document.getElementById('hdr-attacks').textContent = attackCount;
+  }
+  if (!startTime) startTime = Date.now();
+  const elapsed = Math.floor((Date.now() - startTime) / 1000);
+  const m = String(Math.floor(elapsed/60)).padStart(2,'0');
+  const s = String(elapsed%60).padStart(2,'0');
+  document.getElementById('hdr-uptime').textContent = `${m}:${s}`;
+}
+
+// ── process incoming event ────────────────────────────────────
+function processEvent(event) {
+  const r = event.result;
+  sweepCount = event.sweep_n;
+
+  drawSpectrum(event.spectrum);
+  pushWaterfall(event.spectrum);
+  updateBanner(r.level, r.label, r.confidence);
+  updateStats(event.feats, r.level);
+  updateProbas(r.all_proba, r.label);
+  updateIso(r.iso_score);
+  drawBandChart(event.feats.wifi_band_energy,
+                event.feats.ble_band_energy,
+                event.feats.bt_band_energy);
+  appendLog(event);
+  updateHeader(event.sweep_n, r.level);
+}
+
+// ── WebSocket ─────────────────────────────────────────────────
+function connect() {
+  const ws = new WebSocket('ws://localhost:8765');
+
+  ws.onopen = () => {
+    document.getElementById('connecting').classList.add('hidden');
+    document.getElementById('status-pill').className = 'pill-conn';
+    document.getElementById('status-pill').textContent = 'CONNECTED';
+    if (!startTime) startTime = Date.now();
+  };
+
+  ws.onmessage = e => {
+    try {
+      processEvent(JSON.parse(e.data));
+    } catch(err) { /* ignore malformed */ }
+  };
+
+  ws.onclose = () => {
+    document.getElementById('status-pill').className = 'pill-disc';
+    document.getElementById('status-pill').textContent = 'DISCONNECTED';
+    document.getElementById('connecting').classList.remove('hidden');
+    setTimeout(connect, 3000);
+  };
+
+  ws.onerror = () => ws.close();
+}
+
+// uptime ticker
+setInterval(() => {
+  if (!startTime) return;
+  const elapsed = Math.floor((Date.now() - startTime) / 1000);
+  const m = String(Math.floor(elapsed/60)).padStart(2,'0');
+  const s = String(elapsed%60).padStart(2,'0');
+  document.getElementById('hdr-uptime').textContent = `${m}:${s}`;
+}, 1000);
+
+connect();
+</script>
+</body>
+</html>
